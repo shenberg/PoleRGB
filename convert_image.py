@@ -1,5 +1,13 @@
+#!/usr/bin/python
+
 import sys
-from PIL import Image
+try:
+	# windows
+	from PIL import Image
+except ImportError:
+	# osx
+	import Image
+
 
 def process_pixel(r,g,b, a=255):
 	# invert white to black
@@ -16,7 +24,7 @@ def main():
 	filename = sys.argv[1]
 	#rows = 9 # rows = sys.argv[2]
 
-	im = Image.open(filename)
+	im = Image.open(filename).convert("RGB")
 	cols, rows = im.size
 
 	data = []
