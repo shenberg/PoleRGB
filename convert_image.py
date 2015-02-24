@@ -14,8 +14,7 @@ def process_pixel(r,g,b, a=255):
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
 		# return 0,0,0
 
-	#return r/4,g/4,b/4
-	return b/4,g/4,r/4 # lower brightness and move to bgr format
+	return r/4,g/4,b/4
 
 
 
@@ -44,6 +43,8 @@ def main():
 
 	print "#define IMAGE_COLUMNS {}".format(cols);
 	print "#define IMAGE_ROWS {}".format(rows);
+	print "// pixel size in bytes"
+	print "#define PIXEL_SIZE 3"
 	#print "const uint32_t picture[] PROGMEM = {{\n{data}\n}};".format(data=data_string)
 	print "const uint8_t picture[] PROGMEM = {{\n{data}\n}};".format(data=data_string)
 
