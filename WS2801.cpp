@@ -151,6 +151,29 @@ void WS2801::show(void) {
  // delay(1); // Data is latched by holding clock pin low for 1 millisecond
 }
 
+void WS2801::showProgmem(uint16_t address) {
+  uint16_t i, nl3 = numLEDs; // 3 bytes per LED
+  uint8_t  bit,t,c;
+  //int dm = 1;
+  
+  // Write 24 bits per pixel:
+  for(t=0;t<4;t++) //first by sending 32 low bits
+    SPI.transfer(0x00);
+    for(i=0; i<nl3; i++) 
+  {
+    SPI.transfer(0xFF);
+    SPI.transfer(pgm_read_byte(address + 3*i)); // blue
+    SPI.transfer(pgm_read_byte(address + 3*i+1)); // blue
+    SPI.transfer(pgm_read_byte(address + 3*i+2)); // blue
+    }
+  
+  for(t=0;t<4;t++) //end by sending 32 high bits
+    SPI.transfer(0xFF);
+
+ // delay(1); // Data is latched by holding clock pin low for 1 millisecond
+}
+
+
 // Set pixel color from separate 8-bit R, G, B components:
 void WS2801::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
   if(n < numLEDs) { // Arrays are 0-indexed, thus NOT '<='

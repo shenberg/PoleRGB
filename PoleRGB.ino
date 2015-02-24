@@ -44,11 +44,12 @@ void loop() {
 
 void showImage() {
   for(int col = 0; col < IMAGE_COLUMNS; col++) {
-     for(int row = 0; row < NUM_PIXELS; row++) {
+     /*for(int row = 0; row < NUM_PIXELS; row++) {
        strip.setPixelColor(row, pgm_read_dword( &picture[col*IMAGE_ROWS + row]));
        //strip.setPixelColor(row, 0,255,0);
      }
-     strip.show();
-     delay(3);
+     strip.show();*/
+     strip.showProgmem((uint16_t)&picture[col*IMAGE_ROWS*PIXEL_SIZE]);
+     //delay(3);
   }
 }

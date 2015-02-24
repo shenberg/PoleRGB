@@ -14,6 +14,7 @@ class WS2801 {
   void
     begin(void),
     show(void),
+    showProgmem(uint16_t address), // hack for our RGBX arrays
     setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b),
     setPixelColor(uint16_t n, uint32_t c),
     updatePins(uint8_t dpin, uint8_t cpin), // Change pins, configurable
