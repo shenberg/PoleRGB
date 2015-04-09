@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys
+import argparse
 try:
 	# windows
 	from PIL import Image
@@ -14,18 +15,26 @@ def process_pixel(r,g,b, a=255):
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
 		# return 0,0,0
 
-	return r/4,g/4,b/4
+	return r,g,b
 
 
 
 def main():
-	if len(sys.argv) < 2:
-		print "Usage: {} <filename>".format(sys.argv[0])
-	filename = sys.argv[1]
+	parser = argparse.ArgumentParser()
+	parser.add_argument("image_file", help="Path to an image (gif, jpg, png, etc)")
+	parser.add_argument("-r", "--rescale", help="rescale the image proportionaly so that it's 72 pixels high", action="store_true")
+	args = parser.parse_args()
+
+	filename = args.image_file
 	#rows = 9 # rows = sys.argv[2]
 
 	im = Image.open(filename).convert("RGB")
+	if args.rescale and im.size[1] != 72:
+		ratio = 72.0/im.size[1]
+		im.thumbnail((int(round(im.size[0]*ratio)), 72), Image.ANTIALIAS)
+
 	cols, rows = im.size
+	assert rows == 72
 
 	data = []
 	for column in xrange(cols):
