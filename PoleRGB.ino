@@ -1,8 +1,8 @@
 #include "FastLED.h"
-#include "logo.h"
+//#include "logo.h"
 #include <UIPEthernet.h>
-
-EthernetServer server = EthernetServer(1000);
+#include "netbuffer.h"
+//EthernetServer server = EthernetServer(1000);
 
 #define CLOCK_PIN 20
 #define DATA_PIN 21
@@ -11,7 +11,6 @@ EthernetServer server = EthernetServer(1000);
 CRGB pixels[NUM_PIXELS] = {0};
 
 CLEDController *ledController;
-
 
 void setup() {
   Serial.begin(9600);
@@ -22,49 +21,25 @@ void setup() {
   IPAddress myIP(10,0,0,69);
 
   Ethernet.begin(mac,myIP);
-
-  server.begin();
+  net_setup();
 }
 
-bool flag=false;
 void loop() {
-
+  net_update();
   showImage();
-
-  size_t size;
-
-  if (EthernetClient client = server.available())
-    {
-      while((size = client.available()) > 0)
-        {
-          uint8_t* msg = (uint8_t*)malloc(size);
-          size = client.read(msg,size);
-          Serial.write(msg,size);
-          free(msg);
-        }
-      client.println("DATA from Server!");
-      client.stop();
-      flag=true;
-    }
 }
 
 
 
 void showImage() {
   unsigned long start = millis();
-  for(int col = 0; col < IMAGE_COLUMNS; col++) {
-     /*for(int row = 0; row < NUM_PIXELS; row++) {
-       strip.setPixelColor(row, pgm_read_dword( &picture[col*IMAGE_ROWS + row]));
-       //strip.setPixelColor(row, 0,255,0);
-     }
-     strip.show();*/
-     //if (!flag) memcpy(pixels, &picture[col*IMAGE_ROWS*PIXEL_SIZE], NUM_PIXELS*3);
-
-     CRGB *addr = flag ? (CRGB *)&picture[col*IMAGE_ROWS*PIXEL_SIZE] : pixels;
+  for(int col = 0; col < net_image_width(); col++) {
+     //CRGB *addr = flag ? (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE) : pixels;
+     CRGB *addr = (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE);
      ledController->show(addr, NUM_PIXELS, 255);
   }
   unsigned long end = millis();
   ledController->show(pixels,NUM_PIXELS, 255);
   delay(40);
-  Serial.print("columns = "); Serial.print(IMAGE_COLUMNS); Serial.print(", time= "); Serial.println((end-start));
+  //Serial.print("1columns = "); Serial.print(IMAGE_COLUMNS); Serial.print(", time= "); Serial.println((end-start));
 }
