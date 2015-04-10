@@ -12,7 +12,7 @@ except ImportError:
 	# osx
 	import Image
 
-
+HEIGHT = 90
 def process_pixel(r,g,b, a=255):
 	# invert white to black
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
@@ -52,12 +52,12 @@ def main():
 	#rows = 9 # rows = sys.argv[2]
 
 	im = Image.open(filename).convert("RGB")
-	if args.rescale and im.size[1] != 72:
-		ratio = 72.0/im.size[1]
-		im.thumbnail((int(round(im.size[0]*ratio)), 72), Image.ANTIALIAS)
+	if args.rescale and im.size[1] != HEIGHT:
+		ratio = float(HEIGHT)/im.size[1]
+		im = im.thumbnail((int(round(im.size[0]*ratio)), HEIGHT), Image.ANTIALIAS)
 
 	cols, rows = im.size
-	assert rows == 72
+	assert rows == HEIGHT
 
 	data = []
 	for column in xrange(cols):
