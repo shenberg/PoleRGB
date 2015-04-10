@@ -29,13 +29,13 @@ struct data_packet_t {
 struct new_pic_packet_t {
 	uint16_t width;
 	uint16_t height;
-};
+} __attribute__ ((packed));
 
 struct image_buffer_t {
 	uint16_t width;
 	uint16_t height;
 	uint8_t data[0];
-};
+} __attribute__ ((packed));
 
 
 image_buffer_t *backbuffer = nullptr;
