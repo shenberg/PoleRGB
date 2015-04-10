@@ -2,10 +2,9 @@
 //#include "logo.h"
 #include <UIPEthernet.h>
 #include "netbuffer.h"
-//EthernetServer server = EthernetServer(1000);
 
-#define CLOCK_PIN 20
-#define DATA_PIN 21
+#define CLOCK_PIN 3
+#define DATA_PIN 2
 
 #define NUM_PIXELS 72
 CRGB pixels[NUM_PIXELS] = {0};
@@ -41,5 +40,5 @@ void showImage() {
   unsigned long end = millis();
   ledController->show(pixels,NUM_PIXELS, 255);
   delay(40);
-  //Serial.print("1columns = "); Serial.print(IMAGE_COLUMNS); Serial.print(", time= "); Serial.println((end-start));
+  //Serial.print("columns = "); Serial.print(IMAGE_COLUMNS); Serial.print(", time= "); Serial.println((end-start));
 }
