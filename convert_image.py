@@ -15,7 +15,7 @@ def process_pixel(r,g,b, a=255):
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
 		# return 0,0,0
 
-	return r,g,b
+	return b/4,g/4,r/4
 
 
 

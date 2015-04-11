@@ -4,7 +4,11 @@
 
 #include "logo.h"
 
+////// GLOBALS ////
+
 EthernetUDP udp;
+
+////// TYPES //////
 
 enum packet_type {
 	DATA,
@@ -38,8 +42,68 @@ struct image_buffer_t {
 } __attribute__ ((packed));
 
 
-image_buffer_t *backbuffer = nullptr;
-bool flag = false;
+///// FUNCTIONS ////
+
+class DoubleBuffer {
+public:
+	DoubleBuffer() {
+		buffers = new image_buffer_t*[2];
+		buffers[0] = buffers[1] = nullptr;
+		src = nullptr;
+		dst = nullptr;
+		src_is_zero = false;
+		has_image = false;
+	}
+
+	~DoubleBuffer() {
+		free(src);
+		free(dst);
+		delete[] buffers;
+	}
+
+	void start_picture(uint16_t width, uint16_t height) {
+		uint32_t image_size = 3*width*height;
+		Serial.print("allocating image, width = "); Serial.print(width); Serial.print(", height = "); Serial.println(height);
+
+		free(dst);
+		image_buffer_t *buffer = (image_buffer_t *)malloc(sizeof(image_buffer_t) + image_size);
+		buffer->height = height;
+		buffer->width = width;
+		dst = buffers[src_is_zero ? 1 : 0] = buffer;
+	}
+
+	void write(uint8_t *buffer, uint16_t offset, uint16_t size) {
+		memcpy(dst->data + offset, buffer, size);
+	}
+
+	void done_with_picture() {
+		src_is_zero = !src_is_zero;
+		src = buffers[src_is_zero ? 0 : 1];
+		dst = buffers[src_is_zero ? 1 : 0];
+		has_image = true;
+	}
+
+	const uint8_t * image() const {
+		return has_image ? src->data : picture;
+	}
+
+	uint16_t width() const {
+		return has_image ? src->width : IMAGE_COLUMNS;
+	}
+
+	uint16_t height() const {
+		return has_image ? src->height : IMAGE_ROWS;
+	}
+
+private:
+	bool has_image;
+	bool src_is_zero;
+	image_buffer_t **buffers;
+	image_buffer_t *src;
+	image_buffer_t *dst;
+};
+
+DoubleBuffer image_buffer;
 
 void send_ack(uint16_t sequence) {
 	packet_t ack;
@@ -50,6 +114,7 @@ void send_ack(uint16_t sequence) {
     udp.endPacket();
 }
 
+
 //TODO: assuming packet is valid
 void handle_packet(uint8_t *buffer) {
 	packet_t *header = (packet_t*)buffer;
@@ -58,23 +123,18 @@ void handle_packet(uint8_t *buffer) {
 			// parse packet data as a data_packet struct
 			data_packet_t *packet = (data_packet_t *)&header->data[0];
 			Serial.print("data: offset="); Serial.print(packet->offset); Serial.print(", size="); Serial.print(packet->size); Serial.print(", total="); Serial.println(packet->total_size);
-			memcpy(backbuffer->data + packet->offset, &packet->data[0], packet->size);
+			//memcpy(backbuffer->data + packet->offset, &packet->data[0], packet->size);
+			image_buffer.write(&packet->data[0], packet->offset, packet->size);
 		}
 		break;
 		case NEW_PIC: {
 			new_pic_packet_t *packet = (new_pic_packet_t *)&header->data[0];
-			uint32_t image_size = 3*packet->width*packet->height;
-			Serial.print("allocating image, width = "); Serial.print(packet->width); Serial.print(", height = "); Serial.println(packet->height);
-
-			free(backbuffer);
-			backbuffer = (image_buffer_t *)malloc(sizeof(image_buffer_t) + image_size);
-			backbuffer->height = packet->height;
-			backbuffer->width = packet->width;
+			image_buffer.start_picture(packet->width, packet->height);
 		}
 		break;
 		case SHOW_PIC:
 			Serial.println("starting to use received image!");
-			flag = true; //TODO: hack
+			image_buffer.done_with_picture();
 			break;
 		default:
 			Serial.println("unrecognized packet received!!!");
@@ -83,22 +143,31 @@ void handle_packet(uint8_t *buffer) {
 	send_ack(header->sequence);
 }
 
+
+
+
+/////////////////// API //////////////////////////////////
+
+// access current image
 const uint8_t *net_image() {
-	return flag ? backbuffer->data : picture; //TODO: return network buffer if relevant
+	return image_buffer.image();
 }
+
 uint16_t net_image_width() {
-	return flag ? backbuffer->width : IMAGE_COLUMNS;
+	return image_buffer.width();
 }
+
 uint16_t net_image_height() {
-	return flag ? backbuffer->height : IMAGE_ROWS;
+	return image_buffer.height();
 }
 
-
+// call from main setup()
 void net_setup() {
   int rc = udp.begin(5000);
   Serial.print("initialize UDP result: "); Serial.println(rc);
 }
 
+// call from main loop()
 void net_update() {
   static uint8_t recv_buffer[1024];
   int packetSize = udp.parsePacket();
@@ -109,6 +178,7 @@ void net_update() {
   	// TODO: validate data
 
   	handle_packet(recv_buffer);
+  	//udp.stop();
   }
 }
 

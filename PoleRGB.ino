@@ -6,7 +6,7 @@
 #define CLOCK_PIN 3
 #define DATA_PIN 2
 
-#define NUM_PIXELS 72
+#define NUM_PIXELS 90
 CRGB pixels[NUM_PIXELS] = {0};
 
 CLEDController *ledController;
@@ -35,6 +35,7 @@ void showImage() {
   for(int col = 0; col < net_image_width(); col++) {
      //CRGB *addr = flag ? (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE) : pixels;
      CRGB *addr = (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE);
+     delay(2);
      ledController->show(addr, NUM_PIXELS, 255);
   }
   unsigned long end = millis();

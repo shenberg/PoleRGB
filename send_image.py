@@ -18,18 +18,25 @@ def process_pixel(r,g,b, a=255):
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
 		# return 0,0,0
 
-	return r/4,g/4,b/4
+	return b,g,r
 
 seq = 0
 def send_packet(s, type, data=''):
 	global seq
 	dest_addr = ('10.0.0.69', 5000)
 	buffer = chr(type) + chr(seq) + data
-	s.sendto(buffer, dest_addr)
+	ack_ok = False
+	while not ack_ok:
+		s.sendto(buffer, dest_addr)
 
-	resp, addr = s.recvfrom(1024)
-	if (addr != dest_addr):
-		print "unexpected udp sender: ", addr
+		try:
+			resp, addr = s.recvfrom(1024)
+			if (addr == dest_addr):
+				ack_ok = True
+			else:
+				print "unexpected udp sender: ", addr
+		except socket.timeout:
+			print "didn't get ack in time, retrying"
 
 	if ord(resp[1]) != seq:
 		print "bad ack: seq: {}, expected: {}".format(ord(resp[1]), seq)
@@ -54,7 +61,7 @@ def main():
 	im = Image.open(filename).convert("RGB")
 	if args.rescale and im.size[1] != HEIGHT:
 		ratio = float(HEIGHT)/im.size[1]
-		im = im.thumbnail((int(round(im.size[0]*ratio)), HEIGHT), Image.ANTIALIAS)
+		im = im.resize((int(round(im.size[0]*ratio)), HEIGHT), Image.ANTIALIAS)
 
 	cols, rows = im.size
 	assert rows == HEIGHT
@@ -73,7 +80,8 @@ def main():
 	print "sending data to client"
 	
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+	s.settimeout(2)
+	
 	print "sending NEW_PIC (type = 2)"
 	send_packet(s, 2, struct.pack('<HH', cols, rows))
 
