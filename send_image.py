@@ -18,7 +18,7 @@ def process_pixel(r,g,b, a=255):
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
 		# return 0,0,0
 
-	return b,g,r
+	return r,g,b
 
 seq = 0
 def send_packet(s, type, data=''):
@@ -81,7 +81,7 @@ def main():
 	
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	s.settimeout(2)
-	
+
 	print "sending NEW_PIC (type = 2)"
 	send_packet(s, 2, struct.pack('<HH', cols, rows))
 

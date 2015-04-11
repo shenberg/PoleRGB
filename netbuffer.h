@@ -3,10 +3,12 @@
 #define _NETBUFFER_H_
 
 #include "logo.h"
+#include <IPAddress.h>
 
-////// GLOBALS ////
-
-EthernetUDP udp;
+// UDP server port
+#define PORT 5000
+// due to shitty teensy behavior this needs to be passed to ether::begin
+#define CS_PIN 10 
 
 ////// TYPES //////
 
@@ -62,7 +64,7 @@ public:
 	}
 
 	void start_picture(uint16_t width, uint16_t height) {
-		uint32_t image_size = 3*width*height;
+		uint32_t image_size = PIXEL_SIZE*width*height;
 		Serial.print("allocating image, width = "); Serial.print(width); Serial.print(", height = "); Serial.println(height);
 
 		free(dst);
@@ -72,7 +74,7 @@ public:
 		dst = buffers[src_is_zero ? 1 : 0] = buffer;
 	}
 
-	void write(uint8_t *buffer, uint16_t offset, uint16_t size) {
+	void write(const uint8_t *buffer, uint16_t offset, uint16_t size) {
 		memcpy(dst->data + offset, buffer, size);
 	}
 
@@ -109,26 +111,23 @@ void send_ack(uint16_t sequence) {
 	packet_t ack;
 	ack.type = ACK;
 	ack.sequence = sequence;
-	udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write((uint8_t *)&ack, sizeof(ack));
-    udp.endPacket();
+    ether.makeUdpReply((char *)&ack, sizeof(ack), PORT);
 }
 
 
 //TODO: assuming packet is valid
-void handle_packet(uint8_t *buffer) {
-	packet_t *header = (packet_t*)buffer;
+void handle_packet(const uint8_t *buffer) {
+	const packet_t *header = (const packet_t*)buffer;
 	switch(header->type) {
 		case DATA: {
 			// parse packet data as a data_packet struct
-			data_packet_t *packet = (data_packet_t *)&header->data[0];
+			const data_packet_t *packet = (const data_packet_t *)&header->data[0];
 			Serial.print("data: offset="); Serial.print(packet->offset); Serial.print(", size="); Serial.print(packet->size); Serial.print(", total="); Serial.println(packet->total_size);
-			//memcpy(backbuffer->data + packet->offset, &packet->data[0], packet->size);
 			image_buffer.write(&packet->data[0], packet->offset, packet->size);
 		}
 		break;
 		case NEW_PIC: {
-			new_pic_packet_t *packet = (new_pic_packet_t *)&header->data[0];
+			const new_pic_packet_t *packet = (const new_pic_packet_t *)&header->data[0];
 			image_buffer.start_picture(packet->width, packet->height);
 		}
 		break;
@@ -161,25 +160,45 @@ uint16_t net_image_height() {
 	return image_buffer.height();
 }
 
+// TODO: move/remove
+static byte myip[] = { 10,0,0,69 };
+// gateway ip address
+static byte gwip[] = { 10,0,0,1 };
+static uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
+
+byte Ethernet::buffer[1500];
+
+void udp_callback(uint16_t port, byte ip[4], const char *data, uint16_t len) {
+  IPAddress src(ip[0], ip[1], ip[2], ip[3]);
+  Serial.print("UDP packet from: ");
+  Serial.println(src);
+  Serial.println(port);
+  Serial.println(data);
+  Serial.println(len);
+  handle_packet((const uint8_t *)data);
+}
+
 // call from main setup()
 void net_setup() {
-  int rc = udp.begin(5000);
-  Serial.print("initialize UDP result: "); Serial.println(rc);
+
+#if defined(__MK20DX128__) || defined(__MK20DX256__)
+  #if F_BUS == 48000000
+  spi4teensy3::init(3);
+  #elif F_BUS == 24000000
+  // spi4teensy3::init(2);
+  #endif
+#endif
+  if (ether.begin(sizeof Ethernet::buffer, mac, CS_PIN) == 0)
+    Serial.println( "Failed to access Ethernet controller");
+  ether.staticSetup(myip, gwip);
+
+  ether.udpServerListenOnPort(&udp_callback, 5000);
 }
 
 // call from main loop()
 void net_update() {
-  static uint8_t recv_buffer[1024];
-  int packetSize = udp.parsePacket();
-  if(packetSize)
-  {
-  	Serial.print("received UDP packet, size: "); Serial.println(packetSize);
-  	Serial.println(udp.read(recv_buffer, sizeof(recv_buffer)));
-  	// TODO: validate data
+	ether.packetLoop(ether.packetReceive());
 
-  	handle_packet(recv_buffer);
-  	//udp.stop();
-  }
 }
 
 

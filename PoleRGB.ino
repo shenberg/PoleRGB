@@ -1,6 +1,6 @@
 #include "FastLED.h"
-//#include "logo.h"
-#include <UIPEthernet.h>
+#include <spi4teensy3.h>
+#include <EtherCard.h>
 #include "netbuffer.h"
 
 #define CLOCK_PIN 3
@@ -16,24 +16,17 @@ void setup() {
 
   ledController = &FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN>(pixels, NUM_PIXELS);
 
-  uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
-  IPAddress myIP(10,0,0,69);
-
-  Ethernet.begin(mac,myIP);
   net_setup();
 }
 
 void loop() {
   net_update();
-  showImage();
+  show_image();
 }
 
-
-
-void showImage() {
+void show_image() {
   unsigned long start = millis();
   for(int col = 0; col < net_image_width(); col++) {
-     //CRGB *addr = flag ? (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE) : pixels;
      CRGB *addr = (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE);
      delay(2);
      ledController->show(addr, NUM_PIXELS, 255);
@@ -41,5 +34,4 @@ void showImage() {
   unsigned long end = millis();
   ledController->show(pixels,NUM_PIXELS, 255);
   delay(40);
-  //Serial.print("columns = "); Serial.print(IMAGE_COLUMNS); Serial.print(", time= "); Serial.println((end-start));
 }
