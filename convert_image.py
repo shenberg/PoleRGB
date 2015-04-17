@@ -32,6 +32,9 @@ def main():
 	if args.rescale and im.size[1] != HEIGHT:
 		ratio = float(HEIGHT)/im.size[1]
 		im = im.resize((int(round(im.size[0]*ratio)), HEIGHT), Image.ANTIALIAS)
+	elif im.size[1] > HEIGHT:
+		delta = im.size[1] - HEIGHT
+		im = im.crop((0,delta/2, im.size[0], im.size[1] - delta/2))
 
 	cols, rows = im.size
 	assert rows == HEIGHT

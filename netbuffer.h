@@ -180,7 +180,8 @@ void udp_callback(uint16_t port, byte ip[4], const char *data, uint16_t len) {
 
 // call from main setup()
 void net_setup() {
-
+// see https://slug.blog.aeminium.org/2014/02/27/using-teensy-3-0-3-1-and-enc28j60-ethernet-module-with-ethercad-library/
+// for setup details. this is a custom version of Ethercard, and initialization is different
 #if defined(__MK20DX128__) || defined(__MK20DX256__)
   #if F_BUS == 48000000
   spi4teensy3::init(3);
