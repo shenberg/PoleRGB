@@ -4,6 +4,7 @@
 
 #include "logo.h"
 #include <IPAddress.h>
+#include "display.h"
 
 // UDP server port
 #define PORT 5000
@@ -16,7 +17,9 @@ enum packet_type {
 	DATA,
 	ACK,
 	NEW_PIC,
-	SHOW_PIC
+	SHOW_PIC,
+	COLOR,
+
 };
 
 struct packet_t {
@@ -43,6 +46,17 @@ struct image_buffer_t {
 	uint8_t data[0];
 } __attribute__ ((packed));
 
+struct show_pic_packet_t {
+	uint8_t persistent;
+	uint32_t delay;
+	int32_t count;
+};
+
+struct color_mode_packet_t {
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+};
 
 ///// FUNCTIONS ////
 
@@ -97,6 +111,10 @@ public:
 		return has_image ? src->height : IMAGE_ROWS;
 	}
 
+	void to_display(Display& display) {
+		display.setImage(image(), width(), height());
+	}
+
 private:
 	bool has_image;
 	bool src_is_zero;
@@ -107,8 +125,12 @@ private:
 
 DoubleBuffer image_buffer;
 
-void send_ack(uint16_t sequence) {
+bool change_mode = false;
+
+void send_ack(uint8_t sequence) {
 	packet_t ack;
+	Serial.print("ack to seq: "); Serial.print(sequence); Serial.print(", sizeof: "); Serial.println(sizeof(ack));
+
 	ack.type = ACK;
 	ack.sequence = sequence;
     ether.makeUdpReply((char *)&ack, sizeof(ack), PORT);
@@ -131,19 +153,24 @@ void handle_packet(const uint8_t *buffer) {
 			image_buffer.start_picture(packet->width, packet->height);
 		}
 		break;
-		case SHOW_PIC:
+		case SHOW_PIC: {
 			Serial.println("starting to use received image!");
+			const show_pic_packet_t *packet = (const show_pic_packet_t *)&header->data[0];
+			//TODO: take sent data into account
 			image_buffer.done_with_picture();
-			break;
+			//TODO: choose primary or secondary display by persistent bit
+			Display& display = Display::getPrimaryDisplay();
+			image_buffer.to_display(display);
+			display.setMode(MODE_IMAGE);
+			change_mode = true; //TODO: hack
+		}
+		break;
 		default:
 			Serial.println("unrecognized packet received!!!");
 			break;
 	}
 	send_ack(header->sequence);
 }
-
-
-
 
 /////////////////// API //////////////////////////////////
 
@@ -160,11 +187,17 @@ uint16_t net_image_height() {
 	return image_buffer.height();
 }
 
+bool net_changed_mode() {
+	return change_mode;
+}
+
 // TODO: move/remove
-static byte myip[] = { 10,0,0,69 };
+//static byte myip[] = { 192,168,137,201 };
+static byte myip[] = { 10, 0, 0, 68 + UNIT_NUMBER };
 // gateway ip address
-static byte gwip[] = { 10,0,0,1 };
-static uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
+//static byte gwip[] = { 192,168,137,1 };
+static byte gwip[] = { 10, 0, 0, 138 };
+static uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05 + UNIT_NUMBER};
 
 byte Ethernet::buffer[1500];
 
@@ -194,13 +227,22 @@ void net_setup() {
   ether.staticSetup(myip, gwip);
 
   ether.udpServerListenOnPort(&udp_callback, 5000);
+
+  //TODO: hack, move to different place
+  image_buffer.to_display(Display::getPrimaryDisplay());
 }
 
 // call from main loop()
 void net_update() {
+	change_mode = false;
+	static uint32_t max_time = 0;
+	uint32_t start = millis();
 	ether.packetLoop(ether.packetReceive());
-
+	uint32_t end = millis();
+	if (end - start > max_time) {
+		max_time = end - start;
+		Serial.print("new max network time: "); Serial.println(max_time);
+	}
 }
-
 
 #endif
