@@ -14,24 +14,24 @@ CLEDController *ledController;
 void setup() {
   Serial.begin(9600);
 
-  ledController = &FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN>(pixels, NUM_PIXELS);
+  ledController = &FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, BGR, DATA_RATE_MHZ(12)>(pixels, NUM_PIXELS);
 
   net_setup();
 }
 
 void loop() {
-  net_update();
+  //net_update();
   show_image();
 }
 
 void show_image() {
   unsigned long start = millis();
   for(int col = 0; col < net_image_width(); col++) {
-     CRGB *addr = (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE);
-     delay(2);
-     ledController->show(addr, NUM_PIXELS, 255);
+    CRGB *addr = (CRGB *)(net_image() + col*net_image_height()*PIXEL_SIZE);
+    ledController->show(addr, NUM_PIXELS, 255);
+    net_update(); // give some CPU time to the network
   }
   unsigned long end = millis();
-  ledController->show(pixels,NUM_PIXELS, 255);
-  delay(40);
+  //ledController->show(pixels,NUM_PIXELS, 255);
+  //delay(40);
 }
