@@ -19,6 +19,7 @@ enum packet_type {
 	NEW_PIC,
 	SHOW_PIC,
 	COLOR,
+	BLINK,
 
 };
 
@@ -40,12 +41,6 @@ struct new_pic_packet_t {
 	uint16_t height;
 } __attribute__ ((packed));
 
-struct image_buffer_t {
-	uint16_t width;
-	uint16_t height;
-	uint8_t data[0];
-} __attribute__ ((packed));
-
 struct show_pic_packet_t {
 	uint8_t persistent;
 	uint32_t delay;
@@ -58,22 +53,30 @@ struct color_mode_packet_t {
 	uint8_t b;
 };
 
+
+struct image_buffer_t {
+	uint16_t width;
+	uint16_t height;
+	uint8_t data[0];
+} __attribute__ ((packed));
+
 ///// FUNCTIONS ////
 
 class DoubleBuffer {
 public:
 	DoubleBuffer() {
 		buffers = new image_buffer_t*[2];
-		buffers[0] = buffers[1] = nullptr;
-		src = nullptr;
-		dst = nullptr;
+		buffers[0] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + 100*90*3);
+		buffers[1] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + 100*90*3);
+		src = buffers[0];
+		dst = buffers[1];
 		src_is_zero = false;
 		has_image = false;
 	}
 
 	~DoubleBuffer() {
-		free(src);
-		free(dst);
+		//free(src);
+		//free(dst);
 		delete[] buffers;
 	}
 
@@ -81,11 +84,13 @@ public:
 		uint32_t image_size = PIXEL_SIZE*width*height;
 		Serial.print("allocating image, width = "); Serial.print(width); Serial.print(", height = "); Serial.println(height);
 
-		free(dst);
-		image_buffer_t *buffer = (image_buffer_t *)malloc(sizeof(image_buffer_t) + image_size);
-		buffer->height = height;
-		buffer->width = width;
-		dst = buffers[src_is_zero ? 1 : 0] = buffer;
+		//free(dst);
+		//image_buffer_t *buffer = (image_buffer_t *)malloc(sizeof(image_buffer_t) + image_size);
+		//buffer->height = height;
+		//buffer->width = width;
+		dst = buffers[src_is_zero ? 1 : 0];
+		dst->width = width;
+		dst->height = height;
 	}
 
 	void write(const uint8_t *buffer, uint16_t offset, uint16_t size) {

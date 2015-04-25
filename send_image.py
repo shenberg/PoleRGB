@@ -18,24 +18,30 @@ def process_pixel(r,g,b, a=255):
 	# if a < 150 or (r > 240 and g > 240 and b > 240):
 		# return 0,0,0
 
-	return r,g,b
+	return r/4,g/4,b/4
 
 seq = 0
-def send_packet(s, type, data=''):
+def send_packet(s, type, data='', max_timeouts=2):
 	global seq
-	dest_addr = ('10.0.0.69', 5000)
+	dest_addr = ('10.0.0.70', 5000)
 	buffer = chr(type) + chr(seq) + data
 	ack_ok = False
+	timeout_count = 0
 	while not ack_ok:
 		s.sendto(buffer, dest_addr)
 
 		try:
 			resp, addr = s.recvfrom(1024)
 			if (addr == dest_addr):
+				print seq, resp.encode('hex')
 				ack_ok = True
 			else:
 				print "unexpected udp sender: ", addr
 		except socket.timeout:
+			if timeout_count >= max_timeouts:
+				print "too many timeouts!"
+				return
+			timeout_count += 1
 			print "didn't get ack in time, retrying"
 
 	if ord(resp[1]) != seq:
@@ -52,7 +58,7 @@ def blocks(seq, size):
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("image_file", help="Path to an image (gif, jpg, png, etc)")
-	parser.add_argument("-r", "--rescale", help="rescale the image proportionaly so that it's 72 pixels high", action="store_true")
+	parser.add_argument("-r", "--rescale", help="rescale the image proportionaly so that it's 90 pixels high", action="store_true")
 	args = parser.parse_args()
 
 	filename = args.image_file
@@ -73,7 +79,9 @@ def main():
 	for column in xrange(cols):
 		col_data = []
 		for row in xrange(rows):
-			pixel = im.getpixel((column, row));
+			# invert the image!
+			pixel = im.getpixel((column, HEIGHT - (row + 1)))
+			#pixel = im.getpixel((column, row))
 			#r,g,b = process_pixel(*pixel)
 			col_data.extend(process_pixel(*pixel))
 			#val_to_write = b  | (g << 8) | (r << 16)

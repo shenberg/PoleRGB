@@ -63,13 +63,13 @@ void show_image(const uint8_t *data, uint16_t width, uint16_t height, uint32_t d
       return;
     }
   }
-
   //ledController->show(pixels,NUM_PIXELS, 255);
   //delay(40);
 }
 
 void show_off() {
   ledController->showColor(CRGB::Black, NUM_PIXELS, 255);
+  net_update();
 }
 
 void show_equalizer(uint8_t level) {
@@ -80,6 +80,7 @@ void show_equalizer(uint8_t level) {
 void show_color(CRGB color) {
   //TODO: !!!
   ledController->showColor(color, NUM_PIXELS, 255);
+  net_update();
 }
 
 
