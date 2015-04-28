@@ -27,6 +27,9 @@ def send_packet(s, type, data='', max_timeouts=2):
 	buffer = chr(type) + chr(seq) + data
 	ack_ok = False
 	timeout_count = 0
+
+	#s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	#s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 	while not ack_ok:
 		s.sendto(buffer, dest_addr)
 
@@ -105,7 +108,10 @@ def main():
 		send_packet(s, 0, struct.pack("<HHH", offset, len(chunk), len(pic_flat_data)) + "".join(map(chr, chunk)))
 		offset += len(chunk)
 	print "done sending data!"
-	send_packet(s, 3)
+	#struct.pack params are: delay between showing the image, repeat count, delay between columns of the image
+	#send_packet(s, 3, struct.pack("<LLL", 1000,5,2))
+	# COLOR packet
+	send_packet(s, 4, struct.pack("<LLLBBB", 0, 1, 0, 0,0,0)) #, struct.pack("<LLL", 1000,5,2))
 
 
 if __name__=='__main__':

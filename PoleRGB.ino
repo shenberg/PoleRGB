@@ -1,6 +1,9 @@
 
 //NUMBER OF THIS TEENSY - MATCH THE NUMBER WRITTEN ON THE BOX!!
-#define UNIT_NUMBER 1
+#define UNIT_NUMBER 2
+// if TEST_NETWORK, IP address is 10.0.0.68 + UNIT_NUMBER
+// otherwise 192.168.137.200 + UNIT_NUMBER
+#define TEST_NETWORK
 
 #include "FastLED.h"
 #include <spi4teensy3.h>
@@ -8,27 +11,26 @@
 #include "display.h"
 #include "netbuffer.h"
 
-#define CLOCK_PIN 3
-#define DATA_PIN 2
-
-#define NUM_PIXELS 90
-CRGB pixels[NUM_PIXELS] = {0};
-
-CLEDController *ledController;
+//CLEDController *ledController;
 
 void setup() {
   Serial.begin(9600);
 
-  ledController = &FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, BGR, DATA_RATE_MHZ(12)>(pixels, NUM_PIXELS);
+  //ledController = &FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, BGR, DATA_RATE_MHZ(12)>(pixels, NUM_PIXELS);
+  //ledController->setDither(DISABLE_DITHER);
+
+  // IMPORTANT: Display setup MUST happen before net_setup() due to ugly interdependency between the modules
+
+  Display::setup();
 
   net_setup();
 }
 
 void loop() {
-  net_update();
-  
   //show_image();
   Display& current = Display::getActiveDisplay();
+  current.show();
+  /*
   switch (current.getMode()) {
     case MODE_IMAGE:
       //Serial.println("Image Mode");
@@ -50,9 +52,12 @@ void loop() {
       delay(20);
       break;
   }
+  */
 }
 
 
+
+/*
 void show_image(const uint8_t *data, uint16_t width, uint16_t height, uint32_t delay) {
   for(int col = 0; col < width; col++) {
     CRGB *addr = (CRGB *)(data + col*height*PIXEL_SIZE);
@@ -82,5 +87,5 @@ void show_color(CRGB color) {
   ledController->showColor(color, NUM_PIXELS, 255);
   net_update();
 }
-
+*/
 

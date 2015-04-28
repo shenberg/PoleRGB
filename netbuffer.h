@@ -19,8 +19,6 @@ enum packet_type {
 	NEW_PIC,
 	SHOW_PIC,
 	COLOR,
-	BLINK,
-
 };
 
 struct packet_t {
@@ -41,17 +39,23 @@ struct new_pic_packet_t {
 	uint16_t height;
 } __attribute__ ((packed));
 
+struct display_mode_packet_t {
+	uint32_t delay; // between showing everything once and the next time
+	int32_t repeatCount; // 0 for forever
+} __attribute__ ((packed));
+
 struct show_pic_packet_t {
-	uint8_t persistent;
-	uint32_t delay;
-	int32_t count;
-};
+	display_mode_packet_t displayParams;
+	uint32_t columnDelay;
+} __attribute__ ((packed));
 
 struct color_mode_packet_t {
+	display_mode_packet_t displayParams;
+	uint32_t duration;
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
-};
+} __attribute__ ((packed));
 
 
 struct image_buffer_t {
@@ -65,7 +69,6 @@ struct image_buffer_t {
 class DoubleBuffer {
 public:
 	DoubleBuffer() {
-		buffers = new image_buffer_t*[2];
 		buffers[0] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + 100*90*3);
 		buffers[1] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + 100*90*3);
 		src = buffers[0];
@@ -77,7 +80,6 @@ public:
 	~DoubleBuffer() {
 		//free(src);
 		//free(dst);
-		delete[] buffers;
 	}
 
 	void start_picture(uint16_t width, uint16_t height) {
@@ -123,7 +125,7 @@ public:
 private:
 	bool has_image;
 	bool src_is_zero;
-	image_buffer_t **buffers;
+	image_buffer_t *buffers[2];
 	image_buffer_t *src;
 	image_buffer_t *dst;
 };
@@ -154,20 +156,54 @@ void handle_packet(const uint8_t *buffer) {
 		}
 		break;
 		case NEW_PIC: {
+			Serial.println("new pic");
 			const new_pic_packet_t *packet = (const new_pic_packet_t *)&header->data[0];
 			image_buffer.start_picture(packet->width, packet->height);
 		}
 		break;
 		case SHOW_PIC: {
-			Serial.println("starting to use received image!");
+			Serial.print("SHOW_PIC: Col delay = ");
 			const show_pic_packet_t *packet = (const show_pic_packet_t *)&header->data[0];
 			//TODO: take sent data into account
 			image_buffer.done_with_picture();
 			//TODO: choose primary or secondary display by persistent bit
-			Display& display = Display::getPrimaryDisplay();
-			image_buffer.to_display(display);
-			display.setMode(MODE_IMAGE);
+			Display *display;
+			if (packet->displayParams.repeatCount <= 0) {
+				display = &Display::getPrimaryDisplay();
+				image_buffer.to_display(*display);
+			} else {
+				display = &Display::getSecondaryDisplay();
+				Display::activateSecondaryDisplay();
+				image_buffer.to_display(*display);
+				image_buffer.done_with_picture(); //TODO: hack! make sure temporary buffer is the buffer used by secondary display even if secondary display is active
+			}
+			display->setMode(MODE_IMAGE);
+			display->setColumnDelay(packet->columnDelay);
+			Serial.print(packet->columnDelay); Serial.print(", delay = ");
+			display->setDelay(packet->displayParams.delay);
+			Serial.print(packet->displayParams.delay); Serial.print(", repeatCount = ");
+			display->setRepeatCount(packet->displayParams.repeatCount);
+			Serial.println(packet->displayParams.repeatCount);
+			//display.debug();
 			change_mode = true; //TODO: hack
+		}
+		break; 
+		case COLOR: {
+			Serial.println("show color!");
+			const color_mode_packet_t *packet = (const color_mode_packet_t *)&header->data[0];
+			Display *display;
+			if (packet->displayParams.repeatCount == 0) {
+				display = &Display::getPrimaryDisplay();
+			} else {
+				display = &Display::getSecondaryDisplay();
+				Display::activateSecondaryDisplay();
+			}
+			display->setColor(packet->r, packet->g, packet->b);
+			display->setMode(MODE_COLOR);
+			display->setDuration(packet->duration);
+			display->setDelay(packet->displayParams.delay);
+			display->setRepeatCount(packet->displayParams.repeatCount);
+			change_mode = true;
 		}
 		break;
 		default:
@@ -197,8 +233,11 @@ bool net_changed_mode() {
 }
 
 // TODO: move/remove
-//static byte myip[] = { 192,168,137,201 };
+#ifdef TEST_NETWORK
 static byte myip[] = { 10, 0, 0, 68 + UNIT_NUMBER };
+#else
+static byte myip[] = { 192,168,137,200 + UNIT_NUMBER };
+#endif
 // gateway ip address
 //static byte gwip[] = { 192,168,137,1 };
 static byte gwip[] = { 10, 0, 0, 138 };
@@ -249,5 +288,20 @@ void net_update() {
 		Serial.print("new max network time: "); Serial.println(max_time);
 	}
 }
+
+// wait and provide CPU time to network stack at the same time
+bool net_wait(uint32_t how_long) {
+  uint32_t end_time = millis() + how_long;
+  do {
+    net_update();
+    if (net_changed_mode()) {
+      return true;
+    }
+  } while (millis() + 1 < end_time);
+  // wait last ms with a real wait
+  while (millis() < end_time);
+  return false;
+}
+
 
 #endif
