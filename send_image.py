@@ -12,6 +12,8 @@ except ImportError:
 	# osx
 	import Image
 
+broadcast=True;
+
 HEIGHT = 90
 def process_pixel(r,g,b, a=255):
 	# invert white to black
@@ -22,7 +24,8 @@ def process_pixel(r,g,b, a=255):
 
 seq = 0
 def send_packet(s, type, data='', max_timeouts=2):
-	global seq
+	global seq, broadcast
+	broadcast_addr = ('255.255.255.255', 5000)
 	dest_addr = ('10.0.0.70', 5000)
 	buffer = chr(type) + chr(seq) + data
 	ack_ok = False
@@ -31,7 +34,7 @@ def send_packet(s, type, data='', max_timeouts=2):
 	#s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	#s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 	while not ack_ok:
-		s.sendto(buffer, dest_addr)
+		s.sendto(buffer, dest_addr if not broadcast else broadcast_addr)
 
 		try:
 			resp, addr = s.recvfrom(1024)
@@ -95,6 +98,7 @@ def main():
 	
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	s.settimeout(2)
+	s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
 	print "sending NEW_PIC (type = 2)"
 	send_packet(s, 2, struct.pack('<HH', cols, rows))
@@ -111,7 +115,7 @@ def main():
 	#struct.pack params are: delay between showing the image, repeat count, delay between columns of the image
 	#send_packet(s, 3, struct.pack("<LLL", 1000,5,2))
 	# COLOR packet
-	send_packet(s, 4, struct.pack("<LLLBBB", 0, 1, 0, 0,0,0)) #, struct.pack("<LLL", 1000,5,2))
+	send_packet(s, 4, struct.pack("<LLLBBB", 0, 0, 0, 255,255,0)) #, struct.pack("<LLL", 1000,5,2))
 
 
 if __name__=='__main__':
