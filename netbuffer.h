@@ -19,6 +19,7 @@ enum packet_type {
 	NEW_PIC,
 	SHOW_PIC,
 	COLOR,
+	SHOW_IMMEDIATE,
 };
 
 struct packet_t {
@@ -57,6 +58,10 @@ struct color_mode_packet_t {
 	uint8_t b;
 } __attribute__ ((packed));
 
+struct show_immediate_packet_t {
+	uint8_t data[PIXEL_SIZE * NUM_PIXELS];
+};
+
 
 struct image_buffer_t {
 	uint16_t width;
@@ -67,10 +72,16 @@ struct image_buffer_t {
 ///// FUNCTIONS ////
 
 class DoubleBuffer {
+	static const uint32_t BUFFER_WIDTH = 100;
+	static const uint32_t BUFFER_HEIGHT = IMAGE_ROWS;
+	static uint32_t buffer_size() {
+		return BUFFER_HEIGHT*BUFFER_WIDTH*PIXEL_SIZE;
+	}
+
 public:
 	DoubleBuffer() {
-		buffers[0] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + 100*90*3);
-		buffers[1] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + 100*90*3);
+		buffers[0] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + buffer_size());
+		buffers[1] = (image_buffer_t *)malloc(sizeof(image_buffer_t) + buffer_size());
 		src = buffers[0];
 		dst = buffers[1];
 		src_is_zero = false;
@@ -96,6 +107,10 @@ public:
 	}
 
 	void write(const uint8_t *buffer, uint16_t offset, uint16_t size) {
+		if (offset + size > buffer_size()) {
+			Serial.println("Buffer overflow stopped!");
+			return;
+		}
 		memcpy(dst->data + offset, buffer, size);
 	}
 
@@ -203,6 +218,15 @@ void handle_packet(const uint8_t *buffer) {
 			display->setDuration(packet->duration);
 			display->setDelay(packet->displayParams.delay);
 			display->setRepeatCount(packet->displayParams.repeatCount);
+			change_mode = true;
+		}
+		break;
+		case SHOW_IMMEDIATE: {
+			const show_immediate_packet_t *packet = (const show_immediate_packet_t *)&header->data[0];
+			Display *display = &Display::getPrimaryDisplay();
+			display->setImmediateBuffer(packet->data);
+			display->setMode(MODE_IMMEDIATE);
+			display->setDelay(0);
 			change_mode = true;
 		}
 		break;

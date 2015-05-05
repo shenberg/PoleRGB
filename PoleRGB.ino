@@ -3,7 +3,7 @@
 #define UNIT_NUMBER 2
 // if TEST_NETWORK, IP address is 10.0.0.68 + UNIT_NUMBER
 // otherwise 192.168.137.200 + UNIT_NUMBER
-#define TEST_NETWORK
+//#define TEST_NETWORK
 
 #include "FastLED.h"
 #include <spi4teensy3.h>

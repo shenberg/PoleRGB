@@ -15,6 +15,7 @@ enum DisplayMode {
 	MODE_IMAGE,
 	MODE_COLOR,
 	MODE_EQUALIZER,
+	MODE_IMMEDIATE,
 	MODE_OFF
 };
 
@@ -73,6 +74,10 @@ public:
 		imageBuffer = buffer;
 	}
 
+	void setImmediateBuffer(const uint8_t *buffer) {
+		memcpy(column, buffer, sizeof(column));
+	}
+
 	const uint8_t *getImage() {
 		return imageBuffer;
 	}
@@ -102,8 +107,11 @@ public:
 			net_wait(4000);						
 		}*/
 		for(int32_t i = 0; i < maxIteration; i++) {
-			ledController->showColor(CRGB::Black, NUM_PIXELS, 255);
-			if (net_wait(delay)) break;
+			if (delay > 0) {
+				ledController->showColor(CRGB::Black, NUM_PIXELS, 255);
+				if (net_wait(delay)) break;
+			}
+			
 			bool shouldQuit = false;
 			switch(currentMode) {
 				case MODE_IMAGE:
@@ -111,6 +119,9 @@ public:
 					break;
 				case MODE_COLOR:
 					shouldQuit = show_color();
+					break;
+				case MODE_IMMEDIATE:
+					shouldQuit = show_immediate();
 					break;
 			}
 			/*
@@ -139,6 +150,12 @@ public:
 		uint32_t waitTime = duration == 0 ? 0x7FFFFFFF : duration;
 		if (net_wait(duration)) return true;
 		return false;
+	}
+
+	bool show_immediate() {
+		ledController->show((CRGB *)column, NUM_PIXELS, 255);
+		while(!net_wait(20));
+		return true;
 	}
 	//// global state access ///////
 
@@ -178,6 +195,9 @@ private:
 	uint32_t delay;
 	int32_t repeatCount; // 0 means forever
 	int32_t columnDelay;
+
+	// immediate column;
+	uint8_t column[PIXEL_SIZE*NUM_PIXELS];
 
 	// data for equalizer mode
 	uint8_t equalizerLevel;
