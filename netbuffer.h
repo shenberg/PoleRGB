@@ -6,6 +6,8 @@
 #include <IPAddress.h>
 #include "display.h"
 
+//#define NET_DEBUG
+
 // UDP server port
 #define PORT 5000
 // due to shitty teensy behavior this needs to be passed to ether::begin
@@ -20,6 +22,7 @@ enum packet_type {
 	SHOW_PIC,
 	COLOR,
 	SHOW_IMMEDIATE,
+	SHOW_STREAM,
 };
 
 struct packet_t {
@@ -62,6 +65,10 @@ struct show_immediate_packet_t {
 	uint8_t data[PIXEL_SIZE * NUM_PIXELS];
 };
 
+struct stream_packet_t {
+	uint8_t numColumns;
+	uint8_t data[PIXEL_SIZE*NUM_PIXELS*STREAM_COLUMN_COUNT];
+};
 
 struct image_buffer_t {
 	uint16_t width;
@@ -95,7 +102,9 @@ public:
 
 	void start_picture(uint16_t width, uint16_t height) {
 		uint32_t image_size = PIXEL_SIZE*width*height;
+		#ifdef NET_DEBUG
 		Serial.print("allocating image, width = "); Serial.print(width); Serial.print(", height = "); Serial.println(height);
+		#endif
 
 		//free(dst);
 		//image_buffer_t *buffer = (image_buffer_t *)malloc(sizeof(image_buffer_t) + image_size);
@@ -108,7 +117,9 @@ public:
 
 	void write(const uint8_t *buffer, uint16_t offset, uint16_t size) {
 		if (offset + size > buffer_size()) {
+			#ifdef NET_DEBUG
 			Serial.println("Buffer overflow stopped!");
+			#endif
 			return;
 		}
 		memcpy(dst->data + offset, buffer, size);
@@ -151,7 +162,9 @@ bool change_mode = false;
 
 void send_ack(uint8_t sequence) {
 	packet_t ack;
+	#ifdef NET_DEBUG
 	Serial.print("ack to seq: "); Serial.print(sequence); Serial.print(", sizeof: "); Serial.println(sizeof(ack));
+	#endif
 
 	ack.type = ACK;
 	ack.sequence = sequence;
@@ -166,18 +179,24 @@ void handle_packet(const uint8_t *buffer) {
 		case DATA: {
 			// parse packet data as a data_packet struct
 			const data_packet_t *packet = (const data_packet_t *)&header->data[0];
+			#ifdef NET_DEBUG
 			Serial.print("data: offset="); Serial.print(packet->offset); Serial.print(", size="); Serial.print(packet->size); Serial.print(", total="); Serial.println(packet->total_size);
+			#endif
 			image_buffer.write(&packet->data[0], packet->offset, packet->size);
 		}
 		break;
 		case NEW_PIC: {
+			#ifdef NET_DEBUG
 			Serial.println("new pic");
+			#endif
 			const new_pic_packet_t *packet = (const new_pic_packet_t *)&header->data[0];
 			image_buffer.start_picture(packet->width, packet->height);
 		}
 		break;
 		case SHOW_PIC: {
+			#ifdef NET_DEBUG
 			Serial.print("SHOW_PIC: Col delay = ");
+			#endif
 			const show_pic_packet_t *packet = (const show_pic_packet_t *)&header->data[0];
 			//TODO: take sent data into account
 			image_buffer.done_with_picture();
@@ -194,17 +213,21 @@ void handle_packet(const uint8_t *buffer) {
 			}
 			display->setMode(MODE_IMAGE);
 			display->setColumnDelay(packet->columnDelay);
-			Serial.print(packet->columnDelay); Serial.print(", delay = ");
 			display->setDelay(packet->displayParams.delay);
-			Serial.print(packet->displayParams.delay); Serial.print(", repeatCount = ");
 			display->setRepeatCount(packet->displayParams.repeatCount);
+			#ifdef NET_DEBUG
+			Serial.print(packet->columnDelay); Serial.print(", delay = ");
+			Serial.print(packet->displayParams.delay); Serial.print(", repeatCount = ");
 			Serial.println(packet->displayParams.repeatCount);
+			#endif
 			//display.debug();
 			change_mode = true; //TODO: hack
 		}
 		break; 
 		case COLOR: {
+			#ifdef NET_DEBUG
 			Serial.println("show color!");
+			#endif
 			const color_mode_packet_t *packet = (const color_mode_packet_t *)&header->data[0];
 			Display *display;
 			if (packet->displayParams.repeatCount == 0) {
@@ -222,16 +245,31 @@ void handle_packet(const uint8_t *buffer) {
 		}
 		break;
 		case SHOW_IMMEDIATE: {
+			#ifdef NET_DEBUG
+			Serial.println("Got immediate mode packet! Unsupported forever!");
+			#endif
+			/*
 			const show_immediate_packet_t *packet = (const show_immediate_packet_t *)&header->data[0];
 			Display *display = &Display::getPrimaryDisplay();
 			display->setImmediateBuffer(packet->data);
 			display->setMode(MODE_IMMEDIATE);
 			display->setDelay(0);
 			change_mode = true;
+			*/
+		}
+		break;
+		case SHOW_STREAM: {
+			const stream_packet_t *packet = (const stream_packet_t *)&header->data[0];
+			Display *display = &Display::getPrimaryDisplay();
+			display->setMode(MODE_STREAM);
+			display->writeToStream(packet->data, packet->numColumns);
+			change_mode = true;
 		}
 		break;
 		default:
+			#ifdef NET_DEBUG
 			Serial.println("unrecognized packet received!!!");
+			#endif
 			break;
 	}
 	send_ack(header->sequence);
@@ -258,25 +296,27 @@ bool net_changed_mode() {
 
 // TODO: move/remove
 #ifdef TEST_NETWORK
-static byte myip[] = { 10, 0, 0, 68 + UNIT_NUMBER };
+static byte myip[] PROGMEM = { 10, 0, 0, 68 + UNIT_NUMBER };
 #else
-static byte myip[] = { 192,168,137,200 + UNIT_NUMBER };
+static byte myip[] PROGMEM = { 192,168,137,200 + UNIT_NUMBER };
 #endif
 // gateway ip address
 //static byte gwip[] = { 192,168,137,1 };
-static byte gwip[] = { 10, 0, 0, 138 };
-static uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05 + UNIT_NUMBER};
+static const byte gwip[] PROGMEM = { 10, 0, 0, 138 };
+static const uint8_t mac[6] PROGMEM = {0x00,0x01,0x02,0x03,0x04,0x05 + UNIT_NUMBER};
 
 byte Ethernet::buffer[1500];
 
 void udp_callback(uint16_t port, byte ip[4], const char *data, uint16_t len) {
-  IPAddress src(ip[0], ip[1], ip[2], ip[3]);
-  Serial.print("UDP packet from: ");
-  Serial.println(src);
-  Serial.println(port);
-  Serial.println(data);
-  Serial.println(len);
-  handle_packet((const uint8_t *)data);
+	#ifdef NET_DEBUG
+	IPAddress src(ip[0], ip[1], ip[2], ip[3]);
+	Serial.print("UDP packet from: ");
+	Serial.println(src);
+	Serial.println(port);
+	Serial.println(data);
+	Serial.println(len);
+	#endif
+	handle_packet((const uint8_t *)data);
 }
 
 // call from main setup()
@@ -285,32 +325,39 @@ void net_setup() {
 // for setup details. this is a custom version of Ethercard, and initialization is different
 #if defined(__MK20DX128__) || defined(__MK20DX256__)
   #if F_BUS == 48000000
-  spi4teensy3::init(3);
+	spi4teensy3::init(3);
   #elif F_BUS == 24000000
   // spi4teensy3::init(2);
   #endif
 #endif
-  if (ether.begin(sizeof Ethernet::buffer, mac, CS_PIN) == 0)
-    Serial.println( "Failed to access Ethernet controller");
-  ether.staticSetup(myip, gwip);
+	if (ether.begin(sizeof Ethernet::buffer, mac, CS_PIN) == 0) {
+		#ifdef NET_DEBUG
+		Serial.println( "Failed to access Ethernet controller");
+		#endif
+	}
+	ether.staticSetup(myip, gwip);
 
-  ether.udpServerListenOnPort(&udp_callback, 5000);
+	ether.udpServerListenOnPort(&udp_callback, 5000);
 
-  //TODO: hack, move to different place
-  image_buffer.to_display(Display::getPrimaryDisplay());
+	//TODO: hack, move to different place
+	image_buffer.to_display(Display::getPrimaryDisplay());
 }
 
 // call from main loop()
 void net_update() {
 	change_mode = false;
+	#ifdef NET_DEBUG
 	static uint32_t max_time = 0;
 	uint32_t start = millis();
+	#endif
 	ether.packetLoop(ether.packetReceive());
+	#ifdef NET_DEBUG
 	uint32_t end = millis();
 	if (end - start > max_time) {
 		max_time = end - start;
 		Serial.print("new max network time: "); Serial.println(max_time);
 	}
+	#endif
 }
 
 // wait and provide CPU time to network stack at the same time
