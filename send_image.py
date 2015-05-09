@@ -26,7 +26,7 @@ seq = 0
 def send_packet(s, type, data='', max_timeouts=2):
 	global seq, broadcast
 	broadcast_addr = ('255.255.255.255', 5000)
-	dest_addr = ('10.0.0.70', 5000)
+	dest_addr = ('192.168.137.204', 5000)
 	buffer = chr(type) + chr(seq) + data
 	ack_ok = False
 	timeout_count = 0
@@ -107,15 +107,17 @@ def main():
 	pic_flat_data = reduce(lambda x,y: x+y, data)
 	print "sending data packets"
 	offset = 0
-	for chunk in blocks(pic_flat_data, 900): # send 900 bytes of image data per packet
-		print "sending packet: offset {}, size: {}, total: {}".format(offset, len(chunk), len(pic_flat_data))
-		send_packet(s, 0, struct.pack("<HHH", offset, len(chunk), len(pic_flat_data)) + "".join(map(chr, chunk)))
-		offset += len(chunk)
+	while True:
+		for chunk in blocks(pic_flat_data, 1350): # send 900 bytes of image data per packet
+			print "sending packet: offset {}, size: {}, total: {}".format(offset, len(chunk), len(pic_flat_data))
+			#send_packet(s, 0, struct.pack("<HHH", offset, len(chunk), len(pic_flat_data)) + "".join(map(chr, chunk)))
+			send_packet(s, 6, chr(len(chunk)/(HEIGHT*3)) + "".join(map(chr, chunk)))
+			offset += len(chunk)
 	print "done sending data!"
 	#struct.pack params are: delay between showing the image, repeat count, delay between columns of the image
 	#send_packet(s, 3, struct.pack("<LLL", 1000,5,2))
 	# COLOR packet
-	send_packet(s, 4, struct.pack("<LLLBBB", 0, 0, 0, 255,255,0)) #, struct.pack("<LLL", 1000,5,2))
+	#send_packet(s, 4, struct.pack("<LLLBBB", 0, 0, 0, 255,255,0)) #, struct.pack("<LLL", 1000,5,2))
 
 
 if __name__=='__main__':
