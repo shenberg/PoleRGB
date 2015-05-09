@@ -1,6 +1,6 @@
 
 //NUMBER OF THIS TEENSY - MATCH THE NUMBER WRITTEN ON THE BOX!!
-#define UNIT_NUMBER 2
+#define UNIT_NUMBER 4
 // if TEST_NETWORK, IP address is 10.0.0.68 + UNIT_NUMBER
 // otherwise 192.168.137.200 + UNIT_NUMBER
 //#define TEST_NETWORK
@@ -14,7 +14,7 @@
 //CLEDController *ledController;
 
 void setup() {
-  Serial.begin(9600);
+  //Serial.begin(9600);
 
   //ledController = &FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, BGR, DATA_RATE_MHZ(12)>(pixels, NUM_PIXELS);
   //ledController->setDither(DISABLE_DITHER);
